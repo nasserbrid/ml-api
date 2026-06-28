@@ -31,7 +31,7 @@ app = FastAPI(title="voclaire ML API", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.cors_origins,
+    allow_origins=settings.get_cors_list(),
     allow_methods=["POST", "GET"],
     allow_headers=["Content-Type"],
 )
