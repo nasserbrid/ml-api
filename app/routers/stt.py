@@ -1,0 +1,39 @@
+import io
+
+import numpy as np
+from fastapi import APIRouter, File, HTTPException, Request, UploadFile
+from pydub import AudioSegment
+
+from app.logger import logger
+from app.schemas.stt import STTResponse
+
+router = APIRouter(prefix="/stt", tags=["stt"])
+
+WHISPER_SAMPLE_RATE = 16000
+
+
+@router.post("", response_model=STTResponse)
+async def speech_to_text(file: UploadFile = File(...), request: Request = None) -> STTResponse:
+    audio_bytes = await file.read()
+
+    try:
+        audio_segment = AudioSegment.from_file(io.BytesIO(audio_bytes))
+    except Exception as error:
+        raise HTTPException(status_code=400, detail=f"Format audio invalide : {error}")
+
+    audio_segment = audio_segment.set_channels(1).set_frame_rate(WHISPER_SAMPLE_RATE)
+
+    raw_samples = np.array(audio_segment.get_array_of_samples(), dtype=np.float32)
+    audio_float32 = raw_samples / (2 ** 15)
+
+    duration = len(audio_float32) / WHISPER_SAMPLE_RATE
+    logger.info("Transcription en cours — durée audio : %.1fs", duration)
+
+    result = request.app.state.pipeline_stt(
+        {"array": audio_float32, "sampling_rate": WHISPER_SAMPLE_RATE}
+    )
+
+    transcription = result["text"].strip()
+    logger.debug("Transcription terminée : %d caractères", len(transcription))
+
+    return STTResponse(text=transcription)

@@ -1,12 +1,13 @@
 import os
 from contextlib import asynccontextmanager
 
+import torch
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from kokoro import KPipeline
+from transformers import pipeline
 
 from app.logger import logger
-from app.routers import tts
+from app.routers import stt
 from config.settings import settings
 
 
@@ -15,10 +16,14 @@ async def lifespan(app: FastAPI):
     if settings.hf_token:
         os.environ["HF_TOKEN"] = settings.hf_token
 
-    logger.info("Chargement des pipelines Kokoro...")
-    app.state.pipeline_en = KPipeline(lang_code="a", repo_id="hexgrad/Kokoro-82M")
-    app.state.pipeline_fr = KPipeline(lang_code="f", repo_id="hexgrad/Kokoro-82M")
-    logger.info("Pipelines chargés — API prête.")
+    logger.info("Chargement du modèle Whisper large-v3-turbo...")
+    app.state.pipeline_stt = pipeline(
+        "automatic-speech-recognition",
+        model="openai/whisper-large-v3-turbo",
+        dtype=torch.float32,
+        device="cpu",
+    )
+    logger.info("Modèle Whisper chargé — API prête.")
     yield
 
 
@@ -31,7 +36,7 @@ app.add_middleware(
     allow_headers=["Content-Type"],
 )
 
-app.include_router(tts.router)
+app.include_router(stt.router)
 
 
 @app.get("/health", tags=["infra"])
