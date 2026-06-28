@@ -1,0 +1,8 @@
+.env
+.venv
+docs/
+__pycache__
+*.pyc
+.python-version
+*.md
+.git/
