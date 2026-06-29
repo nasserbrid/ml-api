@@ -6,6 +6,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     hf_token: str | None = None
     cors_origins: str = "http://localhost:5173"
+    hf_adapter_id: str = "nasserbrid/whisper-large-v3-turbo-fr"
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
