@@ -7,6 +7,7 @@ class Settings(BaseSettings):
     hf_token: str | None = None
     cors_origins: str = "http://localhost:5173"
     hf_adapter_id: str = "nasserbrid/whisper-large-v3-turbo-fr"
+    pro_initial_prompt: str = "compte rendu réunion procès-verbal contrat devis facture rapport"
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 

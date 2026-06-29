@@ -10,9 +10,6 @@ from app.schemas.stt import STTResponse
 router = APIRouter(prefix="/stt", tags=["stt"])
 
 WHISPER_SAMPLE_RATE = 16000
-PRO_INITIAL_PROMPT = (
-    "compte rendu réunion procès-verbal contrat devis facture rapport"
-)
 
 
 def _decode_audio(audio_bytes: bytes) -> np.ndarray:
@@ -55,7 +52,10 @@ async def speech_to_text_pro(file: UploadFile = File(...), request: Request = No
 
     result = request.app.state.pipeline_stt_pro(
         {"array": audio_float32, "sampling_rate": WHISPER_SAMPLE_RATE},
-        generate_kwargs={"language": "fr", "initial_prompt": PRO_INITIAL_PROMPT},
+        generate_kwargs={
+            "language": "fr",
+            "prompt_ids": request.app.state.pro_prompt_ids,
+        },
     )
 
     transcription = result["text"].strip()

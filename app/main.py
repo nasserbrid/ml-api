@@ -43,6 +43,9 @@ async def lifespan(app: FastAPI):
         dtype=torch.float32,
         device="cpu",
     )
+    app.state.pro_prompt_ids = processor.tokenizer.get_prompt_ids(
+        settings.pro_initial_prompt, return_tensors="pt"
+    )
     logger.info("Modèle pro chargé — API prête.")
     yield
 
