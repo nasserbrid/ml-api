@@ -23,6 +23,7 @@ async def lifespan(app: FastAPI):
     app.state.pipeline_stt = pipeline(
         "automatic-speech-recognition",
         model=BASE_MODEL_ID,
+        chunk_length_s=30,
         dtype=torch.float32,
         device="cpu",
     )
@@ -40,6 +41,7 @@ async def lifespan(app: FastAPI):
         model=merged_model,
         tokenizer=processor.tokenizer,
         feature_extractor=processor.feature_extractor,
+        chunk_length_s=30,
         dtype=torch.float32,
         device="cpu",
     )
