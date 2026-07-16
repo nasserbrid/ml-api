@@ -1,5 +1,7 @@
 import io
+import os
 import subprocess
+import tempfile
 import wave
 
 import numpy as np
@@ -14,22 +16,32 @@ WHISPER_SAMPLE_RATE = 16000
 
 
 def _normalize_to_wav(audio_bytes: bytes) -> bytes:
-    # -err_detect ignore_err tolère les paquets Opus corrompus produits par MediaRecorder (WebM sans durée)
-    result = subprocess.run(
-        [
-            "ffmpeg",
-            "-err_detect", "ignore_err",
-            "-i", "pipe:0",
-            "-f", "wav",
-            "-ac", "1",
-            "-ar", str(WHISPER_SAMPLE_RATE),
-            "-acodec", "pcm_s16le",
-            "-loglevel", "error",
-            "pipe:1",
-        ],
-        input=audio_bytes,
-        capture_output=True,
-    )
+    # Écriture sur disque obligatoire : les conteneurs box-based (MP4/M4A) placent parfois
+    # l'atome moov après les données audio (pas de "faststart") — un pipe:0 stdin est
+    # séquentiel et non-seekable, ffmpeg ne peut alors pas relire la table des échantillons
+    # et produit un WAV vide (header seul) sans lever d'erreur explicite.
+    with tempfile.NamedTemporaryFile(delete=False) as tmp_input:
+        tmp_input.write(audio_bytes)
+        tmp_input_path = tmp_input.name
+
+    try:
+        result = subprocess.run(
+            [
+                "ffmpeg",
+                "-err_detect", "ignore_err",
+                "-i", tmp_input_path,
+                "-f", "wav",
+                "-ac", "1",
+                "-ar", str(WHISPER_SAMPLE_RATE),
+                "-acodec", "pcm_s16le",
+                "-loglevel", "error",
+                "pipe:1",
+            ],
+            capture_output=True,
+        )
+    finally:
+        os.unlink(tmp_input_path)
+
     if not result.stdout:
         detail = result.stderr.decode(errors="replace")
         raise HTTPException(status_code=400, detail=f"Format audio invalide : {detail}")

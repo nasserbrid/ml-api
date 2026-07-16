@@ -19,36 +19,34 @@ async def lifespan(app: FastAPI):
     if settings.hf_token:
         os.environ["HF_TOKEN"] = settings.hf_token
 
-    logger.info("Chargement du modèle Whisper large-v3-turbo (base)...")
-    app.state.pipeline_stt = pipeline(
-        "automatic-speech-recognition",
-        model=BASE_MODEL_ID,
-        chunk_length_s=30,
-        dtype=torch.float32,
-        device="cpu",
-    )
-    logger.info("Modèle base chargé.")
-
     logger.info("Chargement de l'adapter LoRA %s...", settings.hf_adapter_id)
     base_model = WhisperForConditionalGeneration.from_pretrained(
         BASE_MODEL_ID, torch_dtype=torch.float32
     )
     peft_model = PeftModel.from_pretrained(base_model, settings.hf_adapter_id)
     merged_model = peft_model.merge_and_unload()
+    merged_model.eval()
+
+    logger.info("Quantisation dynamique int8 du modèle mergé...")
+    quantized_model = torch.quantization.quantize_dynamic(
+        merged_model, {torch.nn.Linear}, dtype=torch.qint8
+    )
+
     processor = WhisperProcessor.from_pretrained(BASE_MODEL_ID)
-    app.state.pipeline_stt_pro = pipeline(
+    shared_pipeline = pipeline(
         "automatic-speech-recognition",
-        model=merged_model,
+        model=quantized_model,
         tokenizer=processor.tokenizer,
         feature_extractor=processor.feature_extractor,
         chunk_length_s=30,
-        dtype=torch.float32,
         device="cpu",
     )
+    app.state.pipeline_stt = shared_pipeline
+    app.state.pipeline_stt_pro = shared_pipeline
     app.state.pro_prompt_ids = processor.tokenizer.get_prompt_ids(
         settings.pro_initial_prompt, return_tensors="pt"
     )
-    logger.info("Modèle pro chargé — API prête.")
+    logger.info("Modèle unique (LoRA mergé + quantisé int8) chargé — API prête.")
     yield
 
 
