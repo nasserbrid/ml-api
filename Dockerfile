@@ -6,6 +6,8 @@ RUN apt-get update && apt-get install -y libsndfile1 ffmpeg curl && rm -rf /var/
 
 WORKDIR /app
 
+ENV UV_HTTP_TIMEOUT=300
+
 COPY pyproject.toml uv.lock ./
 RUN uv sync --frozen --no-install-project
 
