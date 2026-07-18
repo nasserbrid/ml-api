@@ -24,7 +24,7 @@ async def lifespan(app: FastAPI):
 
     logger.info("Chargement du pipeline de diarisation pyannote/speaker-diarization-3.1...")
     app.state.diarization_pipeline = Pipeline.from_pretrained(
-        "pyannote/speaker-diarization-3.1", use_auth_token=settings.hf_token
+        "pyannote/speaker-diarization-3.1"
     )
     logger.info("Pipeline de diarisation chargé — API prête.")
     yield
