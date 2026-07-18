@@ -4,6 +4,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from faster_whisper import WhisperModel
+from pyannote.audio import Pipeline
 
 from app.logger import logger
 from app.routers import stt
@@ -19,7 +20,13 @@ async def lifespan(app: FastAPI):
     app.state.whisper_model = WhisperModel(
         "large-v3-turbo", device="cpu", compute_type="int8"
     )
-    logger.info("Modèle faster-whisper chargé — API prête.")
+    logger.info("Modèle faster-whisper chargé.")
+
+    logger.info("Chargement du pipeline de diarisation pyannote/speaker-diarization-3.1...")
+    app.state.diarization_pipeline = Pipeline.from_pretrained(
+        "pyannote/speaker-diarization-3.1", use_auth_token=settings.hf_token
+    )
+    logger.info("Pipeline de diarisation chargé — API prête.")
     yield
 
 
