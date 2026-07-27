@@ -26,6 +26,12 @@ async def lifespan(app: FastAPI):
     app.state.diarization_pipeline = Pipeline.from_pretrained(
         "pyannote/speaker-diarization-3.1"
     )
+    if app.state.diarization_pipeline is None:
+        raise RuntimeError(
+            "Échec du chargement du pipeline de diarisation pyannote/speaker-diarization-3.1 : "
+            "vérifier HF_TOKEN et l'acceptation des conditions d'utilisation sur "
+            "pyannote/speaker-diarization-3.1 ET pyannote/segmentation-3.0 (huggingface.co)."
+        )
     logger.info("Pipeline de diarisation chargé — API prête.")
     yield
 
