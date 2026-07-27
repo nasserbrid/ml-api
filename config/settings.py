@@ -9,6 +9,10 @@ class Settings(BaseSettings):
     hf_adapter_id: str = "nasserbrid/whisper-large-v3-turbo-fr"
     pro_initial_prompt: str = "compte rendu réunion procès-verbal contrat devis facture rapport"
 
+    # Logs centralisés (Better Stack)
+    logtail_source_token: str = ""
+    logtail_ingesting_host: str = ""
+
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
     def get_cors_list(self) -> list[str]:
