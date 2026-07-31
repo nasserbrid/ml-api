@@ -5,8 +5,12 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from faster_whisper import WhisperModel
 from pyannote.audio import Pipeline
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+from slowapi.middleware import SlowAPIMiddleware
 
 from app.logger import logger
+from app.rate_limit import limiter
 from app.routers import stt
 from config.settings import settings
 
@@ -37,6 +41,10 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="voclaire ML API", lifespan=lifespan)
+
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+app.add_middleware(SlowAPIMiddleware)
 
 app.add_middleware(
     CORSMiddleware,

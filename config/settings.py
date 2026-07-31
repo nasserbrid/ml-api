@@ -13,6 +13,10 @@ class Settings(BaseSettings):
     logtail_source_token: str = ""
     logtail_ingesting_host: str = ""
 
+    # Sécurité — auth interne + limite de taille upload
+    internal_api_key: str | None = None
+    max_upload_bytes: int = 1024 * 1024 * 1024  # 1 Go
+
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
     def get_cors_list(self) -> list[str]:

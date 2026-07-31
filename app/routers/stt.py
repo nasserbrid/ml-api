@@ -2,14 +2,29 @@ import os
 import subprocess
 import tempfile
 
-from fastapi import APIRouter, File, HTTPException, Request, UploadFile
+from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile
 
+from app.dependencies import verify_internal_api_key
 from app.logger import logger
+from app.rate_limit import limiter
 from app.schemas.stt import DiarizedSegment, STTResponse
+from config.settings import settings
 
 router = APIRouter(prefix="/stt", tags=["stt"])
 
 WHISPER_SAMPLE_RATE = 16000
+MAX_UPLOAD_BYTES = settings.max_upload_bytes
+
+
+async def _read_with_limit(file: UploadFile) -> bytes:
+    chunks: list[bytes] = []
+    total = 0
+    while chunk := await file.read(1024 * 1024):
+        total += len(chunk)
+        if total > MAX_UPLOAD_BYTES:
+            raise HTTPException(status_code=413, detail="Fichier audio trop volumineux.")
+        chunks.append(chunk)
+    return b"".join(chunks)
 
 
 def _normalize_to_wav(audio_bytes: bytes) -> str:
@@ -101,8 +116,13 @@ def _transcribe_and_diarize(request: Request, wav_path: str) -> STTResponse:
 
 
 @router.post("", response_model=STTResponse)
-async def speech_to_text(file: UploadFile = File(...), request: Request = None) -> STTResponse:
-    audio_bytes = await file.read()
+@limiter.limit("10/minute")
+async def speech_to_text(
+    request: Request,
+    file: UploadFile = File(...),
+    _: None = Depends(verify_internal_api_key),
+) -> STTResponse:
+    audio_bytes = await _read_with_limit(file)
     wav_path = _normalize_to_wav(audio_bytes)
 
     try:
@@ -112,8 +132,13 @@ async def speech_to_text(file: UploadFile = File(...), request: Request = None) 
 
 
 @router.post("/pro", response_model=STTResponse)
-async def speech_to_text_pro(file: UploadFile = File(...), request: Request = None) -> STTResponse:
-    audio_bytes = await file.read()
+@limiter.limit("10/minute")
+async def speech_to_text_pro(
+    request: Request,
+    file: UploadFile = File(...),
+    _: None = Depends(verify_internal_api_key),
+) -> STTResponse:
+    audio_bytes = await _read_with_limit(file)
     wav_path = _normalize_to_wav(audio_bytes)
 
     try:
