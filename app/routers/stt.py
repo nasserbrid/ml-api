@@ -2,7 +2,9 @@ import os
 import subprocess
 import tempfile
 
-from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile
+from typing import Optional
+
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
 
 from app.dependencies import verify_internal_api_key
 from app.logger import logger
@@ -95,13 +97,19 @@ def _merge(diarization, fw_segments) -> list[dict]:
     return merged
 
 
-def _transcribe_and_diarize(request: Request, wav_path: str) -> STTResponse:
+def _transcribe_and_diarize(
+    request: Request, wav_path: str, num_speakers: Optional[int] = None
+) -> STTResponse:
     segments, info = request.app.state.whisper_model.transcribe(
         wav_path, language="fr", beam_size=5, word_timestamps=True
     )
     fw_segments = list(segments)
 
-    diarization = request.app.state.diarization_pipeline(wav_path)
+    diarization_kwargs = {}
+    if num_speakers is not None:
+        diarization_kwargs["num_speakers"] = num_speakers
+
+    diarization = request.app.state.diarization_pipeline(wav_path, **diarization_kwargs)
 
     merged = _merge(diarization, fw_segments)
 
@@ -121,13 +129,14 @@ def _transcribe_and_diarize(request: Request, wav_path: str) -> STTResponse:
 async def speech_to_text(
     request: Request,
     file: UploadFile = File(...),
+    num_speakers: Optional[int] = Form(None, ge=1, le=20),
     _: None = Depends(verify_internal_api_key),
 ) -> STTResponse:
     audio_bytes = await _read_with_limit(file)
     wav_path = _normalize_to_wav(audio_bytes)
 
     try:
-        return _transcribe_and_diarize(request, wav_path)
+        return _transcribe_and_diarize(request, wav_path, num_speakers)
     finally:
         os.unlink(wav_path)
 
@@ -137,12 +146,13 @@ async def speech_to_text(
 async def speech_to_text_pro(
     request: Request,
     file: UploadFile = File(...),
+    num_speakers: Optional[int] = Form(None, ge=1, le=20),
     _: None = Depends(verify_internal_api_key),
 ) -> STTResponse:
     audio_bytes = await _read_with_limit(file)
     wav_path = _normalize_to_wav(audio_bytes)
 
     try:
-        return _transcribe_and_diarize(request, wav_path)
+        return _transcribe_and_diarize(request, wav_path, num_speakers)
     finally:
         os.unlink(wav_path)

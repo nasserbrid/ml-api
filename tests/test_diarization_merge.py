@@ -1,6 +1,7 @@
 from types import SimpleNamespace
+from unittest.mock import MagicMock
 
-from app.routers.stt import _merge
+from app.routers.stt import _merge, _transcribe_and_diarize
 
 
 class _FakeDiarization:
@@ -48,3 +49,37 @@ def test_merge_defaults_to_speaker_00_when_no_matching_turn():
     merged = _merge(diarization, fw_segments)
 
     assert merged == [{"speaker": "SPEAKER_00", "text": "Bonjour", "start": 0.0, "end": 1.0}]
+
+
+def _fake_request(diarization_pipeline: MagicMock) -> SimpleNamespace:
+    whisper_model = MagicMock()
+    whisper_model.transcribe.return_value = (
+        [SimpleNamespace(start=0.0, end=1.0, text="Bonjour")],
+        SimpleNamespace(duration=1.0),
+    )
+    return SimpleNamespace(
+        app=SimpleNamespace(
+            state=SimpleNamespace(
+                whisper_model=whisper_model,
+                diarization_pipeline=diarization_pipeline,
+            )
+        )
+    )
+
+
+def test_transcribe_and_diarize_passes_num_speakers_when_provided():
+    diarization_pipeline = MagicMock(return_value=_FakeDiarization([]))
+    request = _fake_request(diarization_pipeline)
+
+    _transcribe_and_diarize(request, "fake.wav", num_speakers=3)
+
+    diarization_pipeline.assert_called_once_with("fake.wav", num_speakers=3)
+
+
+def test_transcribe_and_diarize_omits_num_speakers_when_none():
+    diarization_pipeline = MagicMock(return_value=_FakeDiarization([]))
+    request = _fake_request(diarization_pipeline)
+
+    _transcribe_and_diarize(request, "fake.wav", num_speakers=None)
+
+    diarization_pipeline.assert_called_once_with("fake.wav")
