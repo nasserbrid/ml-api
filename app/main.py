@@ -8,11 +8,26 @@ from pyannote.audio import Pipeline
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.responses import JSONResponse
 
 from app.logger import logger
 from app.rate_limit import limiter
 from app.routers import stt
 from config.settings import settings
+
+
+class ContentLengthLimitMiddleware(BaseHTTPMiddleware):
+    # Rejette une requête surdimensionnée via l'en-tête Content-Length AVANT que
+    # FastAPI ne parse le corps multipart — _read_with_limit() (stt.py) reste la
+    # vraie limite mais n'agit qu'après que Starlette a déjà bufferisé le corps.
+    # Ne couvre pas Transfer-Encoding: chunked (sans Content-Length) : aucun client
+    # de ce projet (backend_voclaire, démo publique) n'envoie de requête chunked.
+    async def dispatch(self, request, call_next):
+        content_length = request.headers.get("content-length")
+        if content_length and int(content_length) > settings.max_upload_bytes:
+            return JSONResponse(status_code=413, content={"detail": "Fichier audio trop volumineux."})
+        return await call_next(request)
 
 
 @asynccontextmanager
@@ -41,6 +56,8 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="voclaire ML API", lifespan=lifespan)
+
+app.add_middleware(ContentLengthLimitMiddleware)
 
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)

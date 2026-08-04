@@ -61,7 +61,8 @@ def _normalize_to_wav(audio_bytes: bytes) -> str:
         detail = result.stderr.decode(errors="replace")
         if os.path.exists(tmp_output_path):
             os.unlink(tmp_output_path)
-        raise HTTPException(status_code=400, detail=f"Format audio invalide : {detail}")
+        logger.warning("Échec de normalisation audio (ffmpeg) : %s", detail)
+        raise HTTPException(status_code=400, detail="Format audio invalide.")
 
     return tmp_output_path
 
