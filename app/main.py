@@ -30,6 +30,16 @@ class ContentLengthLimitMiddleware(BaseHTTPMiddleware):
         return await call_next(request)
 
 
+class SecurityHeadersMiddleware(BaseHTTPMiddleware):
+    # X-Frame-Options/CSP omis volontairement : cette API ne renvoie que du JSON,
+    # jamais rendue dans un navigateur comme une page — aucun effet protecteur réel
+    # ici (contrairement à frontend_voclaire, le vrai correctif à valeur pour ce point).
+    async def dispatch(self, request, call_next):
+        response = await call_next(request)
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        return response
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     if settings.hf_token:
@@ -69,6 +79,8 @@ app.add_middleware(
     allow_methods=["POST", "GET"],
     allow_headers=["Content-Type"],
 )
+
+app.add_middleware(SecurityHeadersMiddleware)
 
 app.include_router(stt.router)
 
