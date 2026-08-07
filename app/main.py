@@ -1,6 +1,7 @@
 import os
 from contextlib import asynccontextmanager
 
+import torch
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from faster_whisper import WhisperModel
@@ -52,9 +53,25 @@ async def lifespan(app: FastAPI):
     logger.info("Modèle faster-whisper chargé.")
 
     logger.info("Chargement du pipeline de diarisation pyannote/speaker-diarization-3.1...")
-    app.state.diarization_pipeline = Pipeline.from_pretrained(
-        "pyannote/speaker-diarization-3.1"
-    )
+    # pyannote/speaker-diarization-3.1 est un checkpoint officiel HuggingFace, gated,
+    # déjà authentifié via HF_TOKEN — même niveau de confiance qu'avant torch 2.6
+    # (où weights_only valait False par défaut). On restaure ce comportement
+    # UNIQUEMENT pour ce chargement précis, pas pour le reste de l'app — la
+    # protection CVE-2025-32434 reste active pour tout autre usage futur de torch.load.
+    _original_torch_load = torch.load
+
+    def _load_trusted_pyannote_checkpoint(*args, **kwargs):
+        kwargs.setdefault("weights_only", False)
+        return _original_torch_load(*args, **kwargs)
+
+    torch.load = _load_trusted_pyannote_checkpoint
+    try:
+        app.state.diarization_pipeline = Pipeline.from_pretrained(
+            "pyannote/speaker-diarization-3.1"
+        )
+    finally:
+        torch.load = _original_torch_load
+
     if app.state.diarization_pipeline is None:
         raise RuntimeError(
             "Échec du chargement du pipeline de diarisation pyannote/speaker-diarization-3.1 : "
