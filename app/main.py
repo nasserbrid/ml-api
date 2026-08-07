@@ -61,7 +61,7 @@ async def lifespan(app: FastAPI):
     _original_torch_load = torch.load
 
     def _load_trusted_pyannote_checkpoint(*args, **kwargs):
-        kwargs.setdefault("weights_only", False)
+        kwargs["weights_only"] = False  # override forcé — weights_only est keyword-only sur torch.load, pas de risque de doublon positionnel
         return _original_torch_load(*args, **kwargs)
 
     torch.load = _load_trusted_pyannote_checkpoint
